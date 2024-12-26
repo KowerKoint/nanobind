@@ -126,10 +126,13 @@ template <typename T>
 struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>> {
     NB_INLINE bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
         if constexpr (std::is_floating_point_v<T>) {
-            if constexpr (sizeof(T) == 8)
-                return detail::load_f64(src.ptr(), flags, &value);
-            else
-                return detail::load_f32(src.ptr(), flags, &value);
+            if constexpr (sizeof(T) == 8 && std::numeric_limits<T>::digits() == 53 && std::numeric_limits<T>::max_exponent() == 1024)
+                return detail::load_f64(src.ptr(), flags, (double *) &value);
+            if constexpr (sizeof(T) == 4 && std::numeric_limits<T>::digits() == 24 && std::numeric_limits<T>::max_exponent() == 128)
+                return detail::load_f32(src.ptr(), flags, (float *) &value);
+            else {
+                static_assert(sizeof(T) != 8 && sizeof(T) != 4, "type_caster for floating types except binary64 and binary32);
+            }
         } else {
             if constexpr (std::is_signed_v<T>) {
                 if constexpr (sizeof(T) == 8)
